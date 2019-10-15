@@ -1,0 +1,70 @@
+---
+general_config:
+   virtual_ip:
+      - 192.168.0.150
+   ip_repository:
+      - 192.168.245.10 
+   RepoFileName:
+      - local    
+   createRepo:
+      - false
+   master_nginx_ip:
+      - 192.168.0.149       
+   
+
+nginx_nodes:
+  node1:
+     hostname: nginx
+     ssh_ip: 192.168.0.148
+     internal_ip: 192.168.0.148
+     primary: true
+     id: 1
+          
+  node2:
+     hostname: nginx
+     ssh_ip: 192.168.0.147
+     internal_ip: 192.168.0.147
+     primary: false
+     id: 2
+     
+  node3:
+     hostname: nginx
+     ssh_ip: 192.168.0.149
+     internal_ip: 192.168.0.149
+     primary: false
+     id: 3
+  
+
+repository:
+  repo1:
+     id: 1
+     title_repo: ansible_repo
+     name: ansible_repo
+     baseurl: ftp://{{ general_config.ip_repository }}/repo
+     gpgcheck: 0
+     enable: 1 
+
+  repo2:
+     id: 2
+     title_repo: ansible_nginx
+     name: ansible_nginx
+     baseurl: ftp://{{ general_config.ip_repository }}/repo/nginxRepo
+     gpgcheck: 0
+     enable: 1 
+  
+  repo3:
+     id: 3
+     title_repo: ansible_mon_packages
+     name: ansible_mon_packages
+     baseurl: ftp://{{ general_config.ip_repository }}/repo/mon-packages
+     gpgcheck: 0
+     enable: 1 
+  
+  repor4:
+     id: 4
+     title_repo: ansible_java
+     name: ansible_java_jdk
+     baseurl: ftp://{{ general_config.ip_repository }}/repo/java
+     gpgcheck: 0
+     enable: 1 
+

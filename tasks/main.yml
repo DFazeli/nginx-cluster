@@ -1,0 +1,20 @@
+---
+
+- block:
+#  - name: --- config repository ---
+#    lineinfile:
+#    dest: "/etc/yum.repos.d/{{ general_config.RepoFileName }}.repo"
+#    line: |
+#       [{{ item.value.title_repo}}]
+#       name= {{ item.value.name }}
+#       baseurl= {{ item.value.baseurl }}
+#       gpgcheck= {{ item.value.gpgcheck }}
+#       enabled= {{ item.value.enable }}
+#    with_dict: "{{ repository }}"
+#    when: "{{ general_config.createRepo }}"
+#    tags:
+#       - repo
+
+  - include: nginx-cluster.yml
+    tags: nginx-cluster
+  become: yes

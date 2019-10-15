@@ -1,0 +1,10 @@
+---
+  - name: 'snmpd restart'
+    service:
+        name: snmpd
+        state: restarted
+   
+  - name: 'set snmpd startup on '
+    shell: chkconfig snmpd on
+
+  

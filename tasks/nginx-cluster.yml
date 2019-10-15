@@ -1,0 +1,166 @@
+---
+
+#Step 1 - Mapping the Hosts File
+
+-  name: ---- Step1  Mapping the Hosts File /etc/hosts ----
+   lineinfile:
+     dest: /etc/hosts
+     state: present
+     line: "{{ item.value.internal_ip }} {{ item.value.hostname }}{{ item.value.id }}"
+   with_dict: "{{ nginx_nodes }}"
+
+# Step 2 - Install and Configure Nginx
+#
+
+- nam: ---- yum clean all ----
+  shell: yum clean all
+
+- name: -------Step2  Install Nginx -------------
+  yum:
+      name: "{{ item }}"
+      state: present
+  with_items:
+     - nginx
+  tags:
+    - install-nginx
+
+- name: ---- Step2 Stop nginx service  --------
+  service:
+     name: nginx
+     state: stopped
+
+# Step 3 - Install Pacemaker, Corosync, and Crmsh
+
+- name: -------Step3  Install Cluster Package -------------
+  yum:
+      name: "{{ item }}"
+      state: present
+  with_items:
+     - pacemaker
+     - corosync
+     - crmsh
+     - haveg*
+  tags:
+    - install-cluster
+
+- name: ----Step3  stop cluster service ----------
+  service:
+     name: "{{ item }}"
+     state: stopped
+  with_items:
+     - pacemaker
+     - corosync   
+  tags:
+    - install-cluster    
+
+#  Step 4 - Configure Corosync
+# Run step 4 only on 'Master' server.
+
+- name: ----Step4 generate corosync key ----
+  shell: |
+     corosync-keygen
+  delegate_to: 192.168.0.149 
+  run_once: true
+  tags:
+     - key
+
+- name: -----Step4 mkdir /var/log/corosync/ ------
+  shell: |
+     mkdir -p /var/log/corosync/
+     touch /var/log/corosync/corosync.log 
+
+- name: ---- cp config /etc/corosync/corosync.conf ---------
+  template: src={{item.src}} dest={{item.dest}}
+  with_items:
+     - { src: 'templates/nginx-cluster-config.j2', dest: '/etc/corosync/corosync.conf' }
+  tags:
+    - install-cluster
+    - temp
+
+- name: ------Step4 find and get list file ------
+  find:
+    paths: /etc/corosync/
+  register: file_2_fetch  
+  delegate_to: 192.168.0.149
+  run_once: true
+#  with_items:
+#     - "{{general_config.master_nginx_ip}}" 
+  tags:
+    - debug
+    - install-cluster
+
+- name: -----Step4 fetch local host ------
+  fetch:
+        src: "{{ item.path }}"
+        dest: /etc/corosync/
+        flat: true
+  with_items:
+    - "{{ file_2_fetch.files }}"
+  delegate_to: 192.168.0.149
+  run_once: true
+  tags:
+    - debug
+    - install-cluster
+
+- name: ----Step4  copy to remote ----
+  copy:
+    src: "{{ item }}"
+    dest: /etc/corosync/
+  with_fileglob: "/etc/corosync/*"
+  tags:
+    - debug
+    - install-cluster
+
+#Step 5 - Start All Cluster Services
+
+- name: ----Step5 started cluster service ----------
+  service:
+     name: "{{ item }}"
+     state: started
+  with_items:
+     - pacemaker
+     - corosync   
+  tags:
+    - install-cluster    
+
+
+#Step 6 - Create and Configure the Cluster
+
+- name: ---- step6 ------------------
+  wait_for:
+    timeout: 15
+  delegate_to: 192.168.0.149
+  tags:
+    - step6
+    
+- name: ----Step6.1  disable no-quorum-policy and stonith-enabled ---------      
+  shell: |
+      sudo crm configure property stonith-enabled=false
+      sudo crm configure property no-quorum-policy=ignore
+  delegate_to: 192.168.0.149
+  run_once: true
+  tags:
+    - step6
+    - step6.1
+    
+- name: --- -Step6.2  Set virtual_ip And webserver Resource -----
+  shell: |
+       sudo crm configure primitive virtual_ip ocf:heartbeat:IPaddr2 params ip="192.168.0.150" cidr_netmask="32" op monitor interval="10s" meta migration-threshold="10"
+       sudo crm configure primitive webserver ocf:heartbeat:nginx configfile=/etc/nginx/nginx.conf op start timeout="40s" interval="0" op stop timeout="60s" interval="0" op monitor interval="10s" timeout="60s" meta migration-threshold="10"
+  delegate_to: 192.168.0.149
+  run_once: true
+  tags:
+    - step6
+    - step6.2
+
+- name: ----- step6.3 create group resource ----------
+  shell: |
+      sudo crm configure group nginx-cluster virtual_ip webserver
+  delegate_to: 192.168.0.149
+  run_once: true
+  tags:
+    - step6
+    - step6.3
+
+
+
